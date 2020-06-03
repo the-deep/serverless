@@ -1,0 +1,6 @@
+package/
+*.zip
+*.pyc
+__pycache__/
+function/
+.mypy_cache/
