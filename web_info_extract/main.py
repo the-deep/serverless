@@ -32,7 +32,10 @@ def create_response(status: int, data: dict) -> dict:
         'body': json.dumps(data),
         'isBase64Encoded': False,
         'statusCode': status,
-        'headers': {}
+        'headers': {
+            'Access-Control-Allow-Origin': '*'
+
+        }
     }
 
 
@@ -89,13 +92,15 @@ def authorize(bearer_token: str):
 def main(api_input, *args, **kwargs):
     params = api_input.get('queryStringParameters') or {}
     headers = api_input.get('headers') or {}
+    method = api_input.get('httpMethod')
 
-    authorize(headers.get('Authorization'))
-    validate_params(params)
-
-    url = params.get('url') or ''
-    extractor = get_web_info_extractor(url)
-    return extractor.serialized_data()
+    if method == 'GET':
+        authorize(headers.get('Authorization'))
+        validate_params(params)
+        url = params.get('url') or ''
+        extractor = get_web_info_extractor(url)
+        return extractor.serialized_data()
+    return {}
 
 
 if __name__ == '__main__':
