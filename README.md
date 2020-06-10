@@ -24,7 +24,7 @@ Services for DEEP Utilities that run in serverless framework.
 ## Requirements Install
 ```bash
 # Install serverless dependencies
-npm install
+yarn install
 
 # Install python requirements
 mkdir .python-venv
