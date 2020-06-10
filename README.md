@@ -1,4 +1,4 @@
-# deep-util-services
+# deep-util-services ![CI](https://github.com/the-deep/deep-util-services/workflows/CI/badge.svg)
 Services for DEEP Utilities that run in serverless framework.
 
 ## Project structure
@@ -39,7 +39,7 @@ The configuration are stored in `secrets` directory. Copy `secrets/sample.json` 
 ```
 # Start local lambda server
 # TODO: hot reload not working
-PYTHONPATH=.python-venv serverless offline
+PYTHONPATH=.python-venv npx sls offline
 
 
 # Unit tests
@@ -57,5 +57,5 @@ aws_secret_access_key = XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 
 For deploying local stage
 ```
-AWS_PROFILE=deep-serverless sls deploy --stage local
+AWS_PROFILE=deep-serverless npx sls deploy --stage local
 ```

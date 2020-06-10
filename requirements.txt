@@ -5,3 +5,4 @@ requests==2.21.0
 tldextract==2.2.0
 pdftitle==0.7
 lambda-decorators
+pytest

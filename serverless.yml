@@ -1,5 +1,5 @@
 service: deep-util-services
-frameworkVersion: "=1.66.0"
+frameworkVersion: "=1.72.0"
 
 provider:
   name: aws
@@ -24,6 +24,9 @@ custom:
     origin: ${self:provider.environment.CORS_DOMAIN}
   pythonRequirements:
     dockerizePip: true
+    noDeploy:
+      # Dependencies of omitted packages must explicitly be omitted too
+      - pytest
   domains:
     beta: services.thedeep.io
     dev: services-alpha.thedeep.io
