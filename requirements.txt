@@ -1,0 +1,7 @@
+PyJWT==1.7.1
+beautifulsoup4==4.7.1
+readability-lxml==0.7
+requests==2.21.0
+tldextract==2.2.0
+pdftitle==0.7
+lambda-decorators

@@ -1,0 +1,77 @@
+service: deep-util-services
+frameworkVersion: "=1.66.0"
+
+provider:
+  name: aws
+  runtime: python3.8
+  stage: ${opt:stage, 'local'}
+  region: us-east-1
+  versionFunctions: false
+  environment:
+    stage: ${self:provider.stage}
+    CORS_DOMAIN: ${file(./secrets/${self:provider.stage}.json):CORS_DOMAIN}
+    JWT_SECRET_OR_PUBLIC_KEY: ${file(./secrets/${self:provider.stage}.json):JWT_SECRET_OR_PUBLIC_KEY}
+
+plugins:
+  - serverless-domain-manager
+  - serverless-python-requirements
+  - serverless-plugin-include-dependencies
+  - serverless-offline  # always last
+
+custom:
+  authorizer: authorizerFunc
+  cors:
+    origin: ${self:provider.environment.CORS_DOMAIN}
+  pythonRequirements:
+    dockerizePip: true
+  domains:
+    beta: services.thedeep.io
+    dev: services-alpha.thedeep.io
+    nightly: services-nightly.thedeep.io
+    local: services-local.thedeep.io
+  customDomain:
+    domainName: ${self:custom.domains.${self:provider.stage}}
+    stage: ${self:provider.stage}
+    createRoute53Record: false
+    certificateArn: ${file(./secrets/${self:provider.stage}.json):CERTIFICATE_ARN}
+
+package:
+  exclude:
+    - .git/**
+    - .gitignore
+    - .DS_Store
+    - npm-debug.log
+    - .serverless/**
+    - .serverless_plugins/**
+    - .python-venv/**
+    - .pytest_cache/**
+
+functions:
+  web_info_extract:
+    handler: src.functions.web_info_extract.handler.main
+    # TODO: Seperate requirements (only handle common modules like utils as vendor)
+    # module: src/functions/web_info_extract
+    events:
+      - http:
+          path: web-info-extract
+          method: get
+          authorizer: ${self:custom.authorizer}
+          cors: ${self:custom.cors}
+
+  authorizerFunc:
+    runtime: nodejs12.x
+    handler: src/authorizer/handler.auth
+
+resources:
+  Resources:
+    GatewayResponseDefault4XX:
+      Type: 'AWS::ApiGateway::GatewayResponse'
+      Properties:
+        ResponseParameters:
+          gatewayresponse.header.Access-Control-Allow-Origin: "'${self:provider.environment.CORS_DOMAIN}'"
+          gatewayresponse.header.Access-Control-Allow-Headers: "'*'"
+        ResponseType: DEFAULT_4XX
+        ResponseTemplates:
+          application/json: ${file(./src/authorizer/error-template.txt)}
+        RestApiId:
+          Ref: 'ApiGatewayRestApi'
