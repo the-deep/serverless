@@ -1,6 +1,24 @@
+import time
+
 from .utils import get_file_name_from_url
 from .validators import validator
 from .camelize import camelize
+
+
+class Timeout:
+    def __init__(self, timeout=30):
+        self.timeout = timeout
+
+    def __call__(self, func_to_be_tracked):
+        def wrapper(*args, **kwargs):
+            start = time.time()
+            ret = func_to_be_tracked(*args, **kwargs)
+            total_time = time.time() - start
+            assert self.timeout >= total_time, f'Total time should be <= 30 instead of {total_time}'
+            return ret
+        wrapper.__name__ = func_to_be_tracked.__name__
+        wrapper.__module__ = func_to_be_tracked.__module__
+        return wrapper
 
 
 def test_get_file_name_from_url():

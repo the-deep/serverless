@@ -7,6 +7,8 @@ provider:
   stage: ${opt:stage, 'local'}
   region: us-east-1
   versionFunctions: false
+  memorySize: 512 # in MB
+  timeout: 30 # in seconds
   environment:
     stage: ${self:provider.stage}
     CORS_DOMAIN: ${file(./secrets/${self:provider.stage}.json):CORS_DOMAIN}
@@ -27,6 +29,7 @@ custom:
     noDeploy:
       # Dependencies of omitted packages must explicitly be omitted too
       - pytest
+      - parameterized
   domains:
     beta: services.thedeep.io
     dev: services-alpha.thedeep.io
@@ -74,6 +77,17 @@ resources:
           gatewayresponse.header.Access-Control-Allow-Origin: "'${self:provider.environment.CORS_DOMAIN}'"
           gatewayresponse.header.Access-Control-Allow-Headers: "'*'"
         ResponseType: DEFAULT_4XX
+        ResponseTemplates:
+          application/json: ${file(./src/authorizer/error-template.txt)}
+        RestApiId:
+          Ref: 'ApiGatewayRestApi'
+    GatewayResponseDefault5XX:
+      Type: 'AWS::ApiGateway::GatewayResponse'
+      Properties:
+        ResponseParameters:
+          gatewayresponse.header.Access-Control-Allow-Origin: "'${self:provider.environment.CORS_DOMAIN}'"
+          gatewayresponse.header.Access-Control-Allow-Headers: "'*'"
+        ResponseType: DEFAULT_5XX
         ResponseTemplates:
           application/json: ${file(./src/authorizer/error-template.txt)}
         RestApiId:

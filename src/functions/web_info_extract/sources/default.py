@@ -92,7 +92,10 @@ class DefaultWebInfoExtractor:
         return None
 
     def get_source(self):
-        return tldextract.extract(self.url).domain
+        # TODO: Don't fetch here. cache when building function. NOTE: Lamba only allows write to /tmp/
+        # https://github.com/john-kurkowski/tldextract#note-about-caching
+        tldextract_extract = tldextract.TLDExtract(cache_file='/tmp/.tldextract-tld_set')
+        return tldextract_extract(self.url).domain
 
     def get_author(self):
         if self.page:
