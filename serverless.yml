@@ -4,23 +4,65 @@ frameworkVersion: "=1.72.0"
 provider:
   name: aws
   runtime: python3.8
-  stage: ${opt:stage, 'local'}
+  stage: ${opt:stage, "local"}
   region: us-east-1
   versionFunctions: false
   memorySize: 512 # in MB
   timeout: 30 # in seconds
   environment:
-    stage: ${self:provider.stage}
+    SERVICE: ${self:service}
+    STAGE: ${self:provider.stage}
     CORS_DOMAIN: ${file(./secrets/${self:provider.stage}.json):CORS_DOMAIN}
     JWT_SECRET_OR_PUBLIC_KEY: ${file(./secrets/${self:provider.stage}.json):JWT_SECRET_OR_PUBLIC_KEY}
-
-plugins:
-  - serverless-domain-manager
-  - serverless-python-requirements
-  - serverless-plugin-include-dependencies
-  - serverless-offline  # always last
+    SOURCE_TABLE_NAME: ${self:custom.sourceTableName}
+    ASYNC_JOB_TABLE_NAME: ${self:custom.asyncJobTableName}
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - dynamodb:Query
+        - dynamodb:Scan
+        - dynamodb:GetItem
+        - dynamodb:BatchGetItem
+        - dynamodb:BatchWriteItem
+        - dynamodb:PutItem
+        - dynamodb:UpdateItem
+        - dynamodb:DeleteItem
+        - dynamodb:DescribeTable
+      Resource:
+        - "arn:aws:dynamodb:${opt:region, self:provider.region}:*:table/${self:provider.environment.SOURCE_TABLE_NAME}"
+        - "arn:aws:dynamodb:${opt:region, self:provider.region}:*:table/${self:provider.environment.ASYNC_JOB_TABLE_NAME}"
+    - Effect: Allow
+      Action:
+        # - lambda:InvokeFunction
+        # - lambda:InvokeAsync
+        - states:StartExecution
+      # TODO: NOT WORKING Resource: ${self:resources.Outputs.SourceExtractStateMachine.Value}
+      Resource: "*"
 
 custom:
+  dynamodb_config:
+    beta:
+      BillingMode: PAY_PER_REQUEST
+    dev:
+      ProvisionedThroughput:
+        ReadCapacityUnits: 1
+        WriteCapacityUnits: 1
+    nightly:
+      ProvisionedThroughput:
+        ReadCapacityUnits: 1
+        WriteCapacityUnits: 1
+    local:
+      BillingMode: PAY_PER_REQUEST
+      # ProvisionedThroughput:
+      #   ReadCapacityUnits: 1
+      #   WriteCapacityUnits: 1
+    BillingMode: ${self:custom.dynamodb_config.${self:provider.stage}.BillingMode, "PROVISIONED"}
+    ProvisionedThroughput: ${self:custom.dynamodb_config.${self:provider.stage}.ProvisionedThroughput}
+  dynamodb:
+    stages:
+      - ${self:provider.stage}
+  sourceTableName: "${self:service}-${self:provider.stage}-sources"
+  asyncJobTableName: "${self:service}-${self:provider.stage}-async-jobs"
   authorizer: authorizerFunc
   cors:
     origin: ${self:provider.environment.CORS_DOMAIN}
@@ -53,25 +95,100 @@ package:
     - .pytest_cache/**
 
 functions:
-  web_info_extract:
-    handler: src.functions.web_info_extract.handler.main
+  webInfoExtract:
+    handler: src.functions.source_extract.handler.web_info_extract
     # TODO: Seperate requirements (only handle common modules like utils as vendor)
-    # module: src/functions/web_info_extract
+    # module: src/functions/source_extract
     events:
       - http:
           path: web-info-extract
           method: get
           authorizer: ${self:custom.authorizer}
           cors: ${self:custom.cors}
+  sourceExtract:
+    handler: src.functions.source_extract.handler.main
+    environment:
+      SOURCE_EXTRACT_STATE_MACHINE_ARN: ${self:resources.Outputs.SourceExtractStateMachine.Value}
+    events:
+      - http:
+          path: source-extract
+          method: post
+          authorizer: ${self:custom.authorizer}
+          cors: ${self:custom.cors}
+
+  sourceExtractJobSuccess:
+    handler: src.functions.source_extract.handler.source_extract_job_success
+  sourceExtractJobMappedTask:
+    handler: src.functions.source_extract.handler.source_extract_job_mapped_task
+    timeout: 120
 
   authorizerFunc:
     runtime: nodejs12.x
     handler: src/authorizer/handler.auth
 
+stepFunctions:
+  stateMachines:
+    SourceExtractStateMachine:
+      name: "sourceExtractStateMachine-${self:provider.stage}"
+      definition:
+        StartAt: SourceExtractJobMappedTask
+        States:
+          # TODO: Handle errors
+          SourceExtractJobMappedTask:
+            Type: Map
+            MaxConcurrency: 50
+            ItemsPath: $.sources
+            ResultPath: $.sources
+            Iterator:
+              StartAt: SourceExtractJobMapTask
+              States:
+                SourceExtractJobMapTask:
+                  Type: Task
+                  Resource:
+                    Fn::GetAtt: [sourceExtractJobMappedTask, Arn]
+                  ResultPath: $.status
+                  End: true
+            Next: SourceExtractJobSuccess
+          SourceExtractJobSuccess:
+            Type: Task
+            Resource:
+              Fn::GetAtt: [sourceExtractJobSuccess, Arn]
+              End: true
+            End: true
+
 resources:
   Resources:
+    AsyncJobTable:
+      Type: "AWS::DynamoDB::Table"
+      Properties:
+        # Make sure to update PynamoDB models
+        AttributeDefinitions:
+          - AttributeName: uuid
+            AttributeType: S
+        KeySchema:
+          - AttributeName: uuid
+            KeyType: HASH
+        BillingMode: ${self:custom.dynamodb_config.BillingMode}
+        ProvisionedThroughput: ${self:custom.dynamodb_config.ProvisionedThroughput}
+        TableName: ${self:custom.asyncJobTableName}
+        TimeToLiveSpecification:
+          AttributeName: ttl
+          Enabled: true
+    SourceTable:
+      Type: "AWS::DynamoDB::Table"
+      Properties:
+        # Make sure to update PynamoDB models
+        AttributeDefinitions:
+          - AttributeName: hash
+            AttributeType: S
+        KeySchema:
+          - AttributeName: hash
+            KeyType: HASH
+        BillingMode: ${self:custom.dynamodb_config.BillingMode}
+        ProvisionedThroughput: ${self:custom.dynamodb_config.ProvisionedThroughput}
+        TableName: ${self:custom.sourceTableName}
     GatewayResponseDefault4XX:
-      Type: 'AWS::ApiGateway::GatewayResponse'
+      Type: "AWS::ApiGateway::GatewayResponse"
       Properties:
         ResponseParameters:
           gatewayresponse.header.Access-Control-Allow-Origin: "'${self:provider.environment.CORS_DOMAIN}'"
@@ -80,9 +197,9 @@ resources:
         ResponseTemplates:
           application/json: ${file(./src/authorizer/error-template.txt)}
         RestApiId:
-          Ref: 'ApiGatewayRestApi'
+          Ref: "ApiGatewayRestApi"
     GatewayResponseDefault5XX:
-      Type: 'AWS::ApiGateway::GatewayResponse'
+      Type: "AWS::ApiGateway::GatewayResponse"
       Properties:
         ResponseParameters:
           gatewayresponse.header.Access-Control-Allow-Origin: "'${self:provider.environment.CORS_DOMAIN}'"
@@ -91,4 +208,17 @@ resources:
         ResponseTemplates:
           application/json: ${file(./src/authorizer/error-template.txt)}
         RestApiId:
-          Ref: 'ApiGatewayRestApi'
+          Ref: "ApiGatewayRestApi"
+  Outputs:
+    SourceExtractStateMachine:
+      Description: The ARN of the source extraction state machine
+      Value:
+        Ref: "SourceExtractStateMachineDash${self:provider.stage}"
+
+plugins:
+  - serverless-domain-manager
+  - serverless-python-requirements
+  - serverless-plugin-include-dependencies
+  - serverless-step-functions
+  - serverless-dynamodb-local
+  - serverless-offline  # always last

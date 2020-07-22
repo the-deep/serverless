@@ -4,7 +4,7 @@ import logging
 
 from .django_utils import DjangoJSONEncoder
 from .validators import ValidationError
-from .camelize import camelize_response
+from .camelize import camelize_response, underscoreize
 
 from lambda_decorators import (
     LambdaDecorator as OLambdaDecorator,
@@ -15,7 +15,7 @@ from lambda_decorators import (
 
 logger = logging.getLogger(__name__)
 
-CORS_DOMAIN = os.environ.get('CORS_DOMAIN', '*')
+CORS_DOMAIN = os.getenv('CORS_DOMAIN', '*')
 VALIDATION_EXCEPTIONS = (
     ValidationError,
 )
@@ -71,8 +71,10 @@ class LambdaDecorator(OLambdaDecorator):
         return super().__call__(event, context)
 
     def before(self, event, context):
-        load_json_body(event=event, context=context)
-        return event, context
+        response = load_json_body(lambda *args: args)(event, context)
+        if type(response) == dict:  # not event, context
+            raise ValidationError('Body parse error')
+        return underscoreize(event), context
 
     @json_http_resp(cls=DjangoJSONEncoder)
     @cors_headers(origin=CORS_DOMAIN, credentials=True)

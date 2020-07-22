@@ -5,7 +5,7 @@ const {
 } = process.env;
 
 // TODO: Send custom message to GatewayResponse template
-const UNAUTHORIZED_MESSAGE = 'Authorization Token missing or invalid';
+const UNAUTHORIZED_MESSAGE = 'Unauthorized';
 
 // TODO: Policy helper function
 const generatePolicy = (principalId, effect, resource) => {

@@ -23,8 +23,10 @@
   "devDependencies": {
     "serverless": "^1.72.0",
     "serverless-domain-manager": "^4.1.1",
-    "serverless-offline": "^6.4.0",
+    "serverless-dynamodb-local": "^0.2.39",
+    "serverless-offline": "^6.3.2",
     "serverless-plugin-include-dependencies": "^4.1.0",
-    "serverless-python-requirements": "^5.1.0"
+    "serverless-python-requirements": "^5.1.0",
+    "serverless-step-functions": "^2.21.1"
   }
 }

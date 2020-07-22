@@ -26,7 +26,9 @@ var/
 *.egg
 
 # Serverless directories
-.serverless
+.serverless/
+.serverless_plugins/
+.dynamodb/
 
 # Secrets
 secrets/**

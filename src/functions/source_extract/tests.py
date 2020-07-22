@@ -1,7 +1,7 @@
 from parameterized import parameterized
 from src.common.tests import Timeout
 
-from .handler import extract
+from .handler import web_info_extract
 
 TEST_CASES = {
     'redhum': {
@@ -50,5 +50,8 @@ def test_web_info_extract(test):
     case = TEST_CASES[test]
     url = case['url']
     response = case['response']
-    resp = extract(url)
+    mock_event = {
+        'queryStringParameters': {'url': url},
+    }
+    resp = web_info_extract(mock_event)
     assert resp == response, f'Response for {url} doesn\'t match'
