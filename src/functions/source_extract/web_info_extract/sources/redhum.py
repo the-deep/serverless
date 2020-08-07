@@ -10,7 +10,7 @@ HEADERS = {
 
 
 class RedhumWebInfoExtractor(DefaultWebInfoExtractor):
-    def __init__(self, url):
+    def __init__(self, url, **kwargs):
         self.url = url
         self.page = {}
         url_parse = re.search(r'https://redhum.org/documento/(?P<report_id>\d+)\/?$', url)

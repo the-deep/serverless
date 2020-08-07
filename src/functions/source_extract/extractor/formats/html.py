@@ -1,14 +1,18 @@
 from readability.readability import Document
 from urllib.parse import urljoin
 
+import html2text
 import logging
 import re
 import requests
 import tempfile
 import base64
-from bs4 import BeautifulSoup
 
-from src.common.utils import write_file
+from src.common.utils import (
+    write_file,
+    get_filename_from_url,
+    get_filename_from_base64,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +36,8 @@ def _get_plain_text(soup):
     return plain_text.strip()
 
 
-def process(doc, url):
+def process(doc, params):
+    url = params['url']
     html_body = Document(doc)
     summary = html_body.summary()
     title = html_body.short_title()
@@ -42,13 +47,17 @@ def process(doc, url):
         try:
             fp = tempfile.NamedTemporaryFile(dir='/tmp/')
             img_src = urljoin(url, img.get('src'))
+            img_name = None
             if re.search(r'http[s]?://', img_src):
                 r = requests.get(img_src, stream=True)
+                img_name = get_filename_from_url(img_src)
                 write_file(r, fp)
             else:
-                image = base64.b64decode(img_src.split(',')[1])
+                img_meta, content = img_src.split(',')
+                image = base64.b64decode(content)
+                img_name = get_filename_from_base64(img_meta)
                 fp.write(image)
-            images.append(fp)
+            images.append((img_name, fp))
         except Exception:
             logger.error(
                 'extractor.formats.html Image Collector Error!!',
@@ -57,10 +66,7 @@ def process(doc, url):
             )
 
     html = '<h1>' + title + '</h1>' + summary
+    html = '<p>{}</p>'.format(html)
 
-    regex = re.compile('\n*', flags=re.IGNORECASE)
-    html = '<p>{}</p>'.format(regex.sub('', html))
-
-    soup = BeautifulSoup(html, 'lxml')
-    text = _get_plain_text(soup)
-    return text, images, 1
+    text = html2text.html2text(html)
+    return text, images, 1, None

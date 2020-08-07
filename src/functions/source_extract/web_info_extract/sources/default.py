@@ -1,13 +1,17 @@
+import requests
+import tldextract
+
 from bs4 import BeautifulSoup
 from readability.readability import Document
 from urllib.parse import urlparse
-import requests
-import tldextract
+from pdftitle import get_title_from_io as get_title_from_pdf
+
 
 from src.functions.source_extract.extractor.document import (  # noqa: F401
     HTML, PDF, DOCX, PPTX, MSWORD,
 )
 from src.common.date_extractor import extract_date
+from src.common.utils import get_file_name_from_url
 
 
 HEADERS = {
@@ -16,23 +20,24 @@ HEADERS = {
 
 
 class DefaultWebInfoExtractor:
-    def __init__(self, url):
+    def __init__(self, url, content=None, document_type=None):
         self.url = url
         self.readable = None
         self.page = None
-        self.content = None
-        self.type = None
+        self.content = content
+        self.type = document_type or HTML
 
-        try:
-            response = requests.get(url, headers=HEADERS, verify=False)
-            self.content = response.content
-        except requests.exceptions.RequestException:
-            return
+        if self.content is None:
+            try:
+                response = requests.get(url, headers=HEADERS, verify=False)
+                self.content = response.text
+            except requests.exceptions.RequestException:
+                return
 
-        self.type = HTML
-        html = response.text
-        self.readable = Document(html)
-        self.page = BeautifulSoup(html, 'lxml')
+        if self.type == HTML:
+            html = self.content
+            self.readable = Document(html)
+            self.page = BeautifulSoup(html, 'lxml')
 
     def get_serialized_data(self):
         date = self.get_date()
@@ -49,10 +54,15 @@ class DefaultWebInfoExtractor:
             'date': date,
             'country': country,
             'website': website,
-            'url': self.url,
         }
 
     def get_title(self):
+        # TODO: Legacy (Remove this)
+        if self.type == PDF:
+            try:
+                return get_title_from_pdf(self.content)
+            except Exception:
+                return get_file_name_from_url(self.url)
         return self.readable and self.readable.short_title()
 
     def get_date(self):

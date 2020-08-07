@@ -54,6 +54,7 @@ def camel_to_underscore(name, **options):
 
 def underscoreize(data, **options):
     ignore_fields = options.get("ignore_fields") or ()
+    options['no_underscore_before_number'] = True
     if isinstance(data, dict):
         new_dict = {}
         for key, value in data.items():

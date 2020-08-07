@@ -1,6 +1,7 @@
 import datetime
 import os
 import logging
+import sentry_sdk
 
 from .django_utils import DjangoJSONEncoder
 from .validators import ValidationError
@@ -15,7 +16,7 @@ from lambda_decorators import (
 
 logger = logging.getLogger(__name__)
 
-CORS_DOMAIN = os.getenv('CORS_DOMAIN', '*')
+CORS_DOMAIN = os.environ.get('CORS_DOMAIN', '*')
 VALIDATION_EXCEPTIONS = (
     ValidationError,
 )
@@ -43,8 +44,14 @@ def create_error_response(exception, event, context) -> dict:
             non_field_errors = [exc_data]
     else:
         # LOG EXCEPTION HERE
+        # with sentry_sdk.configure_scope() as scope:
+        #     scope.user = {
+        #         'id': request.user.id,
+        #         'email': request.user.email,
+        #     }
+        sentry_sdk.capture_exception()
         logger.error(
-            '{}.{}'.format(type(exception).__module__, type(exception).__name__),
+            'ERROR: {}.{}'.format(type(exception).__module__, type(exception).__name__),
             exc_info=True,
             extra={'event': event, 'context': context},
         )
@@ -74,7 +81,9 @@ class LambdaDecorator(OLambdaDecorator):
         response = load_json_body(lambda *args: args)(event, context)
         if type(response) == dict:  # not event, context
             raise ValidationError('Body parse error')
-        return underscoreize(event), context
+        if 'body' in event:
+            event['body'] = underscoreize(event['body'] or {})
+        return event, context
 
     @json_http_resp(cls=DjangoJSONEncoder)
     @cors_headers(origin=CORS_DOMAIN, credentials=True)

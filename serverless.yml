@@ -12,11 +12,22 @@ provider:
   environment:
     SERVICE: ${self:service}
     STAGE: ${self:provider.stage}
-    CORS_DOMAIN: ${file(./secrets/${self:provider.stage}.json):CORS_DOMAIN}
-    JWT_SECRET_OR_PUBLIC_KEY: ${file(./secrets/${self:provider.stage}.json):JWT_SECRET_OR_PUBLIC_KEY}
     SOURCE_TABLE_NAME: ${self:custom.sourceTableName}
     ASYNC_JOB_TABLE_NAME: ${self:custom.asyncJobTableName}
+    CORS_DOMAIN: ${file(./secrets/${self:provider.stage}.json):CORS_DOMAIN}
+    JWT_SECRET_OR_PUBLIC_KEY: ${file(./secrets/${self:provider.stage}.json):JWT_SECRET_OR_PUBLIC_KEY}
+    MEDIA_BUCKET_NAME: ${file(./secrets/${self:provider.stage}.json):MEDIA_BUCKET_NAME}
+    MEDIA_BUCKET_ROOT: ${file(./secrets/${self:provider.stage}.json):MEDIA_BUCKET_ROOT}
+    SENTRY_DNS: ${file(./secrets/${self:provider.stage}.json):SENTRY_DNS}
   iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - s3:ListBucket
+        - s3:HeadObject
+        - s3:GetObject
+        - s3:PutObject
+      Resource:
+        - "arn:aws:s3:::${self:provider.environment.MEDIA_BUCKET_NAME}/*"
     - Effect: Allow
       Action:
         - dynamodb:Query
@@ -40,7 +51,13 @@ provider:
       Resource: "*"
 
 custom:
-  dynamodb_config:
+  stepFunctionConfig:
+    beta:
+      MaxConcurrency: 50
+    local:
+      MaxConcurrency: 50
+    MaxConcurrency: ${self:custom.stepFunctionConfig.${self:provider.stage}.MaxConcurrency, 1}
+  dynamodbConfig:
     beta:
       BillingMode: PAY_PER_REQUEST
     dev:
@@ -56,8 +73,8 @@ custom:
       # ProvisionedThroughput:
       #   ReadCapacityUnits: 1
       #   WriteCapacityUnits: 1
-    BillingMode: ${self:custom.dynamodb_config.${self:provider.stage}.BillingMode, "PROVISIONED"}
-    ProvisionedThroughput: ${self:custom.dynamodb_config.${self:provider.stage}.ProvisionedThroughput}
+    BillingMode: ${self:custom.dynamodbConfig.${self:provider.stage}.BillingMode, "PROVISIONED"}
+    ProvisionedThroughput: ${self:custom.dynamodbConfig.${self:provider.stage}.ProvisionedThroughput}
   dynamodb:
     stages:
       - ${self:provider.stage}
@@ -118,10 +135,13 @@ functions:
 
   sourceExtractJobSuccess:
     handler: src.functions.source_extract.handler.source_extract_job_success
+  sourceExtractJobFailure:
+    handler: src.functions.source_extract.handler.source_extract_job_failure
   sourceExtractJobMappedTask:
     handler: src.functions.source_extract.handler.source_extract_job_mapped_task
     timeout: 120
 
+  # TODO: Deploy without python dependencies
   authorizerFunc:
     runtime: nodejs12.x
     handler: src/authorizer/handler.auth
@@ -136,9 +156,15 @@ stepFunctions:
           # TODO: Handle errors
           SourceExtractJobMappedTask:
             Type: Map
-            MaxConcurrency: 50
+            MaxConcurrency: ${self:custom.stepFunctionConfig.MaxConcurrency}
             ItemsPath: $.sources
             ResultPath: $.sources
+            Catch:
+              - ErrorEquals:
+                - States.ALL
+                ResultPath: $.error
+                Next: SourceExtractJobFailure
+            Next: SourceExtractJobSuccess
             Iterator:
               StartAt: SourceExtractJobMapTask
               States:
@@ -148,11 +174,16 @@ stepFunctions:
                     Fn::GetAtt: [sourceExtractJobMappedTask, Arn]
                   ResultPath: $.status
                   End: true
-            Next: SourceExtractJobSuccess
           SourceExtractJobSuccess:
             Type: Task
             Resource:
               Fn::GetAtt: [sourceExtractJobSuccess, Arn]
+              End: true
+            End: true
+          SourceExtractJobFailure:
+            Type: Task
+            Resource:
+              Fn::GetAtt: [sourceExtractJobFailure, Arn]
               End: true
             End: true
 
@@ -168,8 +199,8 @@ resources:
         KeySchema:
           - AttributeName: uuid
             KeyType: HASH
-        BillingMode: ${self:custom.dynamodb_config.BillingMode}
-        ProvisionedThroughput: ${self:custom.dynamodb_config.ProvisionedThroughput}
+        BillingMode: ${self:custom.dynamodbConfig.BillingMode}
+        ProvisionedThroughput: ${self:custom.dynamodbConfig.ProvisionedThroughput}
         TableName: ${self:custom.asyncJobTableName}
         TimeToLiveSpecification:
           AttributeName: ttl
@@ -179,13 +210,13 @@ resources:
       Properties:
         # Make sure to update PynamoDB models
         AttributeDefinitions:
-          - AttributeName: hash
+          - AttributeName: key
             AttributeType: S
         KeySchema:
-          - AttributeName: hash
+          - AttributeName: key
             KeyType: HASH
-        BillingMode: ${self:custom.dynamodb_config.BillingMode}
-        ProvisionedThroughput: ${self:custom.dynamodb_config.ProvisionedThroughput}
+        BillingMode: ${self:custom.dynamodbConfig.BillingMode}
+        ProvisionedThroughput: ${self:custom.dynamodbConfig.ProvisionedThroughput}
         TableName: ${self:custom.sourceTableName}
     GatewayResponseDefault4XX:
       Type: "AWS::ApiGateway::GatewayResponse"

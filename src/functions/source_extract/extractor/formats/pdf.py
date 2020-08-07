@@ -10,8 +10,11 @@ from pdfminer.converter import TextConverter
 from pdfminer.layout import LAParams
 from pdfminer.pdfpage import PDFPage
 
+from pdftitle import get_title_from_io as get_title_from_pdf
+from src.common.utils import get_file_name_from_url
 
-def process(doc):
+
+def process(doc, params):
     fp = doc
     fp.seek(0)
 
@@ -32,9 +35,18 @@ def process(doc):
                 interpreter.process_page(page)
             content = retstr.getvalue().decode()
     pages_count = get_pages_in_pdf(doc)
-    return content, None, pages_count
+    title = get_title_in_pdf(doc, params and params.get('url'))
+    return content, [], pages_count, {'title': title}
 
 
 def get_pages_in_pdf(file):
     document = PDFDocument(PDFParser(file))
     return resolve1(document.catalog['Pages'])['Count']
+
+
+def get_title_in_pdf(file, url):
+    try:
+        file.seek(0)
+        return get_title_from_pdf(file)
+    except Exception:
+        return url and get_file_name_from_url(url)

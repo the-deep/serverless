@@ -24,7 +24,7 @@ class BaseExtractor:
         Return text, images
         """
         self.verify()
-        return self.__class__.EXTRACT_METHOD(self.doc)
+        return self.__class__.EXTRACT_METHOD(self.doc, self.params)
 
     def verify(self):
         if not self.doc:
@@ -42,11 +42,6 @@ class HtmlExtractor(BaseExtractor):
     """
     ERROR_MSG = "Not a html document"
     EXTRACT_METHOD = html_extract
-
-    def extract(self):
-        self.verify()
-        url = self.params.get('url') if self.params else None
-        return self.__class__.EXTRACT_METHOD(self.doc, url)
 
 
 class PdfExtractor(BaseExtractor):

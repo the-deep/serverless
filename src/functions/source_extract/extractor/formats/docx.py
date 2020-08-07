@@ -1,10 +1,8 @@
 #! /usr/bin/env python3
 
 import xml.etree.ElementTree as ET
-import argparse
 import tempfile
 import zipfile
-import sys
 import re
 import os
 import random
@@ -25,30 +23,6 @@ nsmap = {'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main',
          'a': 'http://schemas.openxmlformats.org/drawingml/2006/main',
          'wP': 'http://schemas.openxmlformats.org/officeDocument/2006/extended-properties',  # noqa
          }
-
-
-def process_args():
-    parser = argparse.ArgumentParser(description='A pure python-based utility '
-                                                 'to extract text and images '
-                                                 'from docx files.')
-    parser.add_argument("docx", help="path of the docx file")
-    parser.add_argument('-i', '--img_dir', help='path of directory '
-                                                'to extract images')
-
-    args = parser.parse_args()
-
-    if not os.path.exists(args.docx):
-        print('File {} does not exist.'.format(args.docx))
-        sys.exit(1)
-
-    if args.img_dir is not None:
-        if not os.path.exists(args.img_dir):
-            try:
-                os.makedirs(args.img_dir)
-            except OSError:
-                print("Unable to create img_dir {}".format(args.img_dir))
-                sys.exit(1)
-    return args
 
 
 def qn(tag):
@@ -97,7 +71,7 @@ def xml2text(xml, pptx=False):
     return text
 
 
-def process(docx, pptx=False, img_dir=None):
+def process(docx, params, pptx=False, img_dir=None):
     text = u''
 
     # unzip the docx in memory
@@ -134,28 +108,23 @@ def process(docx, pptx=False, img_dir=None):
             text += xml2text(zipf.read(fname))
 
     for fname in filelist:
-        _, extension = os.path.splitext(fname)
+        img_name = os.path.basename(fname)
+        _, extension = os.path.splitext(img_name)
         if extension in [".jpg", ".jpeg", ".png", ".bmp"]:
-            if img_dir:
-                dst_fname = os.path.join(img_dir, os.path.basename(fname))
-                with open(dst_fname, "wb") as dst_f:
-                    dst_f.write(zipf.read(fname))
-                images.append(dst_fname)
-            else:
-                dst_f = tempfile.NamedTemporaryFile(dir='/tmp/')
-                dst_f.write(zipf.read(fname))
-                images.append(dst_f)
+            dst_f = tempfile.NamedTemporaryFile(dir='/tmp/')
+            dst_f.write(zipf.read(fname))
+            images.append((img_name, dst_f))
 
     zipf.close()
 
-    return text.strip(), images, page_count
+    return text.strip(), images, page_count, None
 
 
-def pptx_process(docx, img_dir=None):
-    return process(docx, pptx=True, img_dir=None)
+def pptx_process(docx, params, img_dir=None):
+    return process(docx, params, pptx=True, img_dir=None)
 
 
-def msword_process(doc, img_dir=None):
+def msword_process(doc, params, img_dir=None):
     tmp_filepath = '/tmp/{}'.format(
         ''.join(random.sample(string.ascii_lowercase, 10)) + '.doc'
     )
@@ -164,6 +133,7 @@ def msword_process(doc, img_dir=None):
         tmpdoc.write(doc.read())
         tmpdoc.flush()
 
+    # FIXME: THIS DOESN'T WORK
     call([
         'libreoffice', '--headless', '--convert-to', 'docx',
         tmp_filepath, '--outdir', '/tmp/',
@@ -173,9 +143,8 @@ def msword_process(doc, img_dir=None):
         '/tmp/',
         re.sub(r'doc$', 'docx', os.path.basename(tmp_filepath))
     )
-    # docx = open(doc_filename)
 
-    response = process(doc_filename)
+    response = process(doc_filename, params)
 
     # Clean up converted docx file
     call(['rm', '-f', doc_filename, tmp_filepath])
@@ -194,10 +163,3 @@ def get_pages_in_docx(file):
                 file,
             ), exc_info=True)
             return 0
-
-
-if __name__ == '__main__':
-    args = process_args()
-    text, images = process(args.docx, args.img_dir)
-    print(text.encode('utf-8'))
-    print(images)

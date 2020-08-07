@@ -1,5 +1,7 @@
 import os
+import secrets
 import urllib
+from mimetypes import guess_extension
 from urllib.parse import urlparse
 
 
@@ -27,3 +29,32 @@ def get_file_name_from_url(url):
         )
     except Exception:
         pass
+
+
+def get_filename_from_url(url):
+    return os.path.basename(urlparse(url).path)
+
+
+def get_filename_from_base64(content):
+    name = get_random_string(7)
+    try:
+        return name + guess_extension(content.split(';')[0].split(':')[1])
+    except Exception:
+        pass
+    return name
+
+
+def get_random_string(length, allowed_chars=(
+    'abcdefghijklmnopqrstuvwxyz'
+    'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+)):
+    """
+    SOURCE: DJANGO
+    Return a securely generated random string.
+    The bit length of the returned value can be calculated with the formula:
+        log_2(len(allowed_chars)^length)
+    For example, with default `allowed_chars` (26+26+10), this gives:
+      * length: 12, bit length =~ 71 bits
+      * length: 22, bit length =~ 131 bits
+    """
+    return ''.join(secrets.choice(allowed_chars) for i in range(length))
