@@ -1,0 +1,6 @@
+{
+    "timestamp": $context.requestTimeEpoch,
+    "errors": {
+        "nonFieldErrors": ["$context.error.message"]
+    }
+}

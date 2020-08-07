@@ -1,0 +1,14 @@
+PyJWT==1.7.1
+beautifulsoup4==4.7.1
+boto3==1.14.23
+html2text==2020.1.16
+lambda-decorators
+parameterized==0.7.0
+pdfminer.six==20181108
+pdftitle==0.7
+pynamodb==4.3.2
+pytest
+readability-lxml==0.7
+requests==2.21.0
+sentry-sdk>=0,<1
+tldextract==2.2.0
