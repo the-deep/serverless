@@ -70,6 +70,22 @@ def create_error_response(exception, event, context) -> dict:
     return resp_data
 
 
+def validate_mandatory_query_params(*params):
+    """
+    Checks for mandatory query params passed as args.
+    Raises validation error if not found.
+    """
+    def wrapper(func):
+        def wrapped_function(event, *fargs, **fkwargs):
+            query_params = event.get('queryStringParameters') or {}
+            for param in params:
+                if not query_params.get(param):
+                    raise ValidationError(f'"{param}" should be present as a query parameter')
+            func(event, *fargs, **fkwargs)
+        return wrapped_function
+    return wrapper
+
+
 # TODO: Write test
 class LambdaDecorator(OLambdaDecorator):
     def __call__(self, event, context):
