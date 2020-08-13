@@ -26,6 +26,7 @@ def check_duplicates(event, *args, **kwargs):
         raise ValidationError(f'Could not find source with key "{source_key}"')
 
     extract = source.extract.simplified_text
+    max_score = 0
     similar_leads = []
     if extract:
         # TODO: language detect
