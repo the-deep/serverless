@@ -12,7 +12,7 @@ from src.common.validators import validator
 from .web_info_extract.sources import get_web_info_extractor
 from .extractor.web_document import WebDocument
 from .extractor.file_document import FileDocument
-from .models import (
+from src.common.models import (
     Status,
     AsyncJob,
     AsyncJobType,

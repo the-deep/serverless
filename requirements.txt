@@ -12,3 +12,5 @@ readability-lxml==0.7
 requests==2.21.0
 sentry-sdk>=0,<1
 tldextract==2.2.0
+
+deep_utils.deduplication==1.0.5

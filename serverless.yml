@@ -132,7 +132,13 @@ functions:
           method: post
           authorizer: ${self:custom.authorizer}
           cors: ${self:custom.cors}
-
+  checkDuplicates:
+    handler: src.functions.de_duplication.handler.check_duplicates
+    events:
+      - http:
+          path: duplicate-leads
+          method: get
+          cors: ${self.custom.cors}
   sourceExtractJobSuccess:
     handler: src.functions.source_extract.handler.source_extract_job_success
   sourceExtractJobFailure:
