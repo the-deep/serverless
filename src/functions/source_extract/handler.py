@@ -1,24 +1,20 @@
 import logging
 import json
-import boto3
 import os
 import time
+import boto3
 
-from src.common import sentry  # noqa: F401
+from deep_serverless.utils import sentry  # noqa: F401
 
-from src.common.decorators import LambdaDecorator, ValidationError
-from src.common.validators import validator
+from deep_serverless.utils.decorators import LambdaDecorator, ValidationError
+from deep_serverless.utils.validators import validator
+
+from deep_serverless.models.source_extract import Source
+from deep_serverless.models.base import AsyncJob
 
 from .web_info_extract.sources import get_web_info_extractor
 from .extractor.web_document import WebDocument
 from .extractor.file_document import FileDocument
-from .models import (
-    Status,
-    AsyncJob,
-    AsyncJobType,
-    Source,
-    SourceType,
-)
 
 logger = logging.getLogger(__name__)
 
@@ -32,9 +28,9 @@ def source_extract_job_mapped_task(event, *args, **kwargs):
     source = Source.get(source_key)
 
     try:
-        if source.type == SourceType.WEB:
+        if source.type == Source.Type.WEB:
             doc = WebDocument(source.url)
-        elif source.type == SourceType.S3:
+        elif source.type == Source.Type.S3:
             doc = FileDocument(source.get_file(), source.s3_path)
         else:
             raise Exception(f'Invalid Source Type: {source.type}')
@@ -51,7 +47,7 @@ def source_extract_job_mapped_task(event, *args, **kwargs):
 
         source.doc_type = doc_type
         source.last_extracted_at = time.time()
-        source.extract.simplified_text = text
+        source.set_simplified_text(text)
         source.extract.word_count = word_count
         source.extract.page_count = page_count
         source.extract.file_size = file_size
@@ -60,11 +56,12 @@ def source_extract_job_mapped_task(event, *args, **kwargs):
         for image_name, image in images or []:
             source.upload_image(image_name, image)
 
-        source.status = Status.SUCCESS
+        source.status = Source.Status.SUCCESS
     except Exception as e:
         logging.error(f'Failed to extract source: ({source.key}){source.url or source.s3_path}', exc_info=True)
         error_msg = str(e)
-        source.status = Status.ERROR
+        source.status = Source.Status.ERROR
+
     source.save()
 
     if error_msg:
@@ -75,6 +72,17 @@ def source_extract_job_mapped_task(event, *args, **kwargs):
     return source.status
 
 
+def source_extract_job_mapped_task_failure(event, *args, **kwargs):
+    """
+    Unexpected errors.
+    """
+    source_key = event['source_key']
+    source = Source.get(source_key)
+    source.status = Source.Status.FAILED
+    source.save()
+    return source.status
+
+
 def _source_extract_set_status(uuid, status):
     async_job = AsyncJob.get(uuid)
     async_job.status = status
@@ -82,25 +90,26 @@ def _source_extract_set_status(uuid, status):
 
 
 def source_extract_job_success(event, *args, **kwargs):
-    _source_extract_set_status(event['async_job_uuid'], Status.SUCCESS)
+    _source_extract_set_status(event['async_job_uuid'], AsyncJob.Status.SUCCESS)
     return event
 
 
 def source_extract_job_failure(event, *args, **kwargs):
-    _source_extract_set_status(event['async_job_uuid'], Status.FAILED)
+    _source_extract_set_status(event['async_job_uuid'], AsyncJob.Status.FAILED)
     return event
 
 
 @LambdaDecorator
 def main(event, *args, **kwargs):
     body = event.get('body') or {}
-    requested_sources_from_client = body.get('sources')
+    requested_sources_from_client = body.get('sources') or []
     async_job_uuid = body.get('async_job_uuid')
 
     if async_job_uuid is not None:
         async_job = AsyncJob.get(async_job_uuid)
-        if async_job.status == Status.SUCCESS:
+        if async_job.status == AsyncJob.Status.SUCCESS:
             return {
+                'status': async_job.status,
                 'sources': [
                     source.serialize()
                     for source in Source.batch_get(async_job.entities)
@@ -131,13 +140,13 @@ def main(event, *args, **kwargs):
         if s3_path:
             requested_sources[Source.get_s3_key(s3_path)] = {
                 's3_path': s3_path,
-                'type': SourceType.S3,
+                'type': Source.Type.S3,
                 'invalidate': invalidate,
             }
         else:
             requested_sources[Source.get_url_hash(source_url)] = {
                 'url': source_url,
-                'type': SourceType.WEB,
+                'type': Source.Type.WEB,
                 'invalidate': invalidate,
             }
 
@@ -147,7 +156,8 @@ def main(event, *args, **kwargs):
         # Existing sources
         for source in Source.batch_get(requested_sources.keys()):
             invalidate = requested_sources[source.key]['invalidate']
-            if not invalidate and source.status in [Status.ERROR, Status.SUCCESS]:
+            # if not invalidate and source.status in [Source.Status.FAILED, Source.Status.ERROR, Source.Status.SUCCESS]:
+            if not invalidate and source.status in [Source.Status.ERROR, Source.Status.SUCCESS]:
                 existing_sources.append(source.serialize())
             else:
                 to_be_processed_sources.append({'source_key': source.key})
@@ -166,7 +176,7 @@ def main(event, *args, **kwargs):
     async_job = None
     if to_be_processed_sources:
         async_job = AsyncJob()
-        async_job.type = AsyncJobType.SOURCE_EXTRACT
+        async_job.type = AsyncJob.Type.SOURCE_EXTRACT
         async_job.entities = [source['source_key'] for source in to_be_processed_sources]
         async_job.save()
         # TODO: Offline doesn't work

@@ -3,7 +3,7 @@ import os
 import logging
 import sentry_sdk
 
-from .django_utils import DjangoJSONEncoder
+from .django_utils.common import DjangoJSONEncoder
 from .validators import ValidationError
 from .camelize import camelize_response, underscoreize
 

@@ -11,7 +11,7 @@ from gzip import GzipFile
 from tempfile import SpooledTemporaryFile
 from botocore.exceptions import ClientError
 
-from .utils import get_random_string
+from .common import get_random_string
 
 
 def force_bytes(s):
@@ -72,6 +72,7 @@ class Storage():
         return self._bucket
 
     def exists(self, name):
+        name = self._normalize_name(name)
         try:
             self.connection.meta.client.head_object(Bucket=self.bucket_name, Key=name)
             return True
@@ -81,7 +82,8 @@ class Storage():
     def get_alternative_name(self, file_root, file_ext):
         return '%s_%s%s' % (file_root, get_random_string(7), file_ext)
 
-    def get_available_name(self, name, max_length=1024):
+    # NOTE: max_length is defined by the max_length for django FileField default configuration. (Don't change this here)
+    def get_available_name(self, name, max_length=100):
         dir_name, file_name = os.path.split(name)
         file_root, file_ext = os.path.splitext(file_name)
         while self.exists(name) or (max_length and len(name) > max_length):
@@ -133,8 +135,8 @@ class Storage():
     def upload(self, name, content, gzip=True):
         if not name:
             raise Exception('Name is required')
-        name = self._normalize_name(self._clean_name(name))
-        name = self.get_available_name(name)
+        cleaned_name = self.get_available_name(self._clean_name(name))
+        name = self._normalize_name(cleaned_name)
         params = self._get_write_parameters(name, content)
         if (
             gzip and
@@ -143,10 +145,10 @@ class Storage():
         ):
             content = self._compress_content(content)
             params['ContentEncoding'] = 'gzip'
-        obj = self.bucket.Object(name)
         content.seek(0, os.SEEK_SET)
+        obj = self.bucket.Object(name)
         obj.upload_fileobj(content, ExtraArgs=params)
-        return name
+        return cleaned_name
 
     def url(self, name, parameters=None, expire=None, http_method=None):
         name = self._normalize_name(self._clean_name(name))

@@ -1,5 +1,5 @@
 service: deep-util-services
-frameworkVersion: "=1.72.0"
+frameworkVersion: "=1.83.2"
 
 provider:
   name: aws
@@ -10,6 +10,7 @@ provider:
   memorySize: 512 # in MB
   timeout: 30 # in seconds
   environment:
+    IN_LAMBDA: true
     SERVICE: ${self:service}
     STAGE: ${self:provider.stage}
     SOURCE_TABLE_NAME: ${self:custom.sourceTableName}
@@ -17,18 +18,31 @@ provider:
     CORS_DOMAIN: ${file(./secrets/${self:provider.stage}.json):CORS_DOMAIN}
     JWT_SECRET_OR_PUBLIC_KEY: ${file(./secrets/${self:provider.stage}.json):JWT_SECRET_OR_PUBLIC_KEY}
     MEDIA_BUCKET_NAME: ${file(./secrets/${self:provider.stage}.json):MEDIA_BUCKET_NAME}
+    KMS_KEY_ID: ${file(./secrets/${self:provider.stage}.json):KMS_KEY_ID}
     MEDIA_BUCKET_ROOT: ${file(./secrets/${self:provider.stage}.json):MEDIA_BUCKET_ROOT}
     SENTRY_DNS: ${file(./secrets/${self:provider.stage}.json):SENTRY_DNS}
   iamRoleStatements:
     - Effect: Allow
+      Sid: BucketAccess
       Action:
         - s3:ListBucket
-        - s3:HeadObject
-        - s3:GetObject
+        - s3:Head*
+        - s3:Get*
         - s3:PutObject
       Resource:
         - "arn:aws:s3:::${self:provider.environment.MEDIA_BUCKET_NAME}/*"
     - Effect: Allow
+      Sid: KmsAccess
+      Action:
+        - kms:Decrypt
+        - kms:DescribeKey
+        - kms:Encrypt
+        - kms:GenerateDataKey*
+        - kms:ReEncrypt*
+      Resource:
+        - "arn:aws:kms:::key/{self:provider.environment.KMS_KEY_ID}"
+    - Effect: Allow
+      Sid: DynamdbAccess
       Action:
         - dynamodb:Query
         - dynamodb:Scan
@@ -53,7 +67,9 @@ provider:
 custom:
   stepFunctionConfig:
     beta:
-      MaxConcurrency: 50
+      MaxConcurrency: 100
+    nightly:
+      MaxConcurrency: 200
     local:
       MaxConcurrency: 50
     MaxConcurrency: ${self:custom.stepFunctionConfig.${self:provider.stage}.MaxConcurrency, 1}
@@ -65,11 +81,11 @@ custom:
         ReadCapacityUnits: 1
         WriteCapacityUnits: 1
     nightly:
-      ProvisionedThroughput:
-        ReadCapacityUnits: 1
-        WriteCapacityUnits: 1
-    local:
       BillingMode: PAY_PER_REQUEST
+    local:
+      ProvisionedThroughput:
+        ReadCapacityUnits: 5
+        WriteCapacityUnits: 5
       # ProvisionedThroughput:
       #   ReadCapacityUnits: 1
       #   WriteCapacityUnits: 1
@@ -85,9 +101,12 @@ custom:
     origin: ${self:provider.environment.CORS_DOMAIN}
   pythonRequirements:
     dockerizePip: true
+    vendor: ./py-vendor
     noDeploy:
       # Dependencies of omitted packages must explicitly be omitted too
       - pytest
+      - boto3
+      - botocore
       - parameterized
   domains:
     beta: services.thedeep.io
@@ -101,27 +120,23 @@ custom:
     certificateArn: ${file(./secrets/${self:provider.stage}.json):CERTIFICATE_ARN}
 
 package:
+  individually: false
+  include:
+    - "!./**"
+    - "./src/**"
   exclude:
-    - .git/**
-    - .gitignore
-    - .DS_Store
-    - npm-debug.log
-    - .serverless/**
-    - .serverless_plugins/**
-    - .python-venv/**
-    - .pytest_cache/**
+    - "**"
 
 functions:
   webInfoExtract:
     handler: src.functions.source_extract.handler.web_info_extract
-    # TODO: Seperate requirements (only handle common modules like utils as vendor)
-    # module: src/functions/source_extract
     events:
       - http:
           path: web-info-extract
           method: get
           authorizer: ${self:custom.authorizer}
           cors: ${self:custom.cors}
+
   sourceExtract:
     handler: src.functions.source_extract.handler.main
     environment:
@@ -132,14 +147,15 @@ functions:
           method: post
           authorizer: ${self:custom.authorizer}
           cors: ${self:custom.cors}
-
   sourceExtractJobSuccess:
     handler: src.functions.source_extract.handler.source_extract_job_success
   sourceExtractJobFailure:
     handler: src.functions.source_extract.handler.source_extract_job_failure
   sourceExtractJobMappedTask:
     handler: src.functions.source_extract.handler.source_extract_job_mapped_task
-    timeout: 120
+    timeout: 300
+  sourceExtractJobMappedTaskFailure:
+    handler: src.functions.source_extract.handler.source_extract_job_mapped_task_failure
 
   # TODO: Deploy without python dependencies
   authorizerFunc:
@@ -148,6 +164,7 @@ functions:
 
 stepFunctions:
   stateMachines:
+    # TODO: HANDLE LAMBDA ERROR OUTSIDE PYTHON (like timeout)
     SourceExtractStateMachine:
       name: "sourceExtractStateMachine-${self:provider.stage}"
       definition:
@@ -173,7 +190,18 @@ stepFunctions:
                   Resource:
                     Fn::GetAtt: [sourceExtractJobMappedTask, Arn]
                   ResultPath: $.status
+                  Catch:
+                    - ErrorEquals:
+                      - States.ALL
+                      ResultPath: $.error
+                      Next: SourceExtractJobMapTaskFailure
                   End: true
+                SourceExtractJobMapTaskFailure:
+                  Type: Task
+                  Resource:
+                    Fn::GetAtt: [sourceExtractJobMappedTaskFailure, Arn]
+                  End: true
+                  ResultPath: $.status
           SourceExtractJobSuccess:
             Type: Task
             Resource:

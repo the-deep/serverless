@@ -8,7 +8,7 @@ import requests
 import tempfile
 import base64
 
-from src.common.utils import (
+from deep_serverless.utils.common import (
     write_file,
     get_filename_from_url,
     get_filename_from_base64,

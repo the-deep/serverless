@@ -1,7 +1,7 @@
 import tempfile
 import requests
 
-from src.common.utils import DEFAULT_HEADERS, write_file
+from deep_serverless.utils.common import DEFAULT_HEADERS, write_file
 from src.functions.source_extract.web_info_extract.sources import get_web_info_extractor
 from .document import (
     Document,

@@ -11,7 +11,7 @@ from pdfminer.layout import LAParams
 from pdfminer.pdfpage import PDFPage
 
 from pdftitle import get_title_from_io as get_title_from_pdf
-from src.common.utils import get_file_name_from_url
+from deep_serverless.utils.common import get_file_name_from_url
 
 
 def process(doc, params):

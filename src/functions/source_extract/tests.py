@@ -1,5 +1,5 @@
 from parameterized import parameterized
-from src.common.tests import Timeout
+from deep_serverless.utils.tests import Timeout
 
 from .handler import web_info_extract
 

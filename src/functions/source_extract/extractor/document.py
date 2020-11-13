@@ -59,8 +59,11 @@ class Document:
                 self.doc.seek(0, os.SEEK_SET)
             except Exception:
                 pass
-        if extractor:
-            text, images, page_count, extra_meta = extractor(self.doc, self.params).extract()
+
+        if extractor is None:
+            return self.doc_type, None, [], None, None, None, self.extra_meta
+
+        text, images, page_count, extra_meta = extractor(self.doc, self.params).extract()
 
         if text:
             word_count = len(re.findall(r'\b\S+\b', text))

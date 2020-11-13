@@ -1,6 +1,6 @@
 import time
 
-from .utils import get_file_name_from_url
+from .common import get_file_name_from_url
 from .validators import validator
 from .camelize import camelize
 

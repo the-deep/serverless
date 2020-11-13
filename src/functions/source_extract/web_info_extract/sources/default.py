@@ -10,8 +10,8 @@ from pdftitle import get_title_from_io as get_title_from_pdf
 from src.functions.source_extract.extractor.document import (  # noqa: F401
     HTML, PDF, DOCX, PPTX, MSWORD,
 )
-from src.common.date_extractor import extract_date
-from src.common.utils import get_file_name_from_url
+from deep_serverless.utils.date_extractor import extract_date
+from deep_serverless.utils.common import get_file_name_from_url
 
 
 HEADERS = {

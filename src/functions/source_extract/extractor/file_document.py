@@ -21,7 +21,8 @@ class FileDocument(Document):
 
         type = None
         doc = file
-        name, extension = os.path.splitext(name)
+        self.params = {'url': name}
+        extension = os.path.splitext(name)[1]
 
         if extension in self.PDF_TYPES:
             type = PDF
