@@ -1,14 +1,16 @@
 service: deep-util-services
-frameworkVersion: "=1.83.2"
+frameworkVersion: "=2.15.0"
 
 provider:
   name: aws
-  runtime: python3.8
+  runtime: python3.7
   stage: ${opt:stage, "local"}
   region: us-east-1
   versionFunctions: false
   memorySize: 512 # in MB
   timeout: 30 # in seconds
+  apiGateway:
+    shouldStartNameWithService: true
   environment:
     IN_LAMBDA: true
     SERVICE: ${self:service}
@@ -101,7 +103,12 @@ custom:
     origin: ${self:provider.environment.CORS_DOMAIN}
   pythonRequirements:
     dockerizePip: true
+    dockerFile: serverless-python-requirements/Dockerfile
+    dockerExtraFiles:
+      - /usr/lib64/libjpeg.so.62
     vendor: ./py-vendor
+    useDownloadCache: false
+    invalidateCaches: true
     noDeploy:
       # Dependencies of omitted packages must explicitly be omitted too
       - pytest
@@ -127,6 +134,18 @@ package:
   exclude:
     - "**"
 
+layers:
+  headlessChrome:
+    path: layers
+    # path: layers/headless-chrome
+    # Remove this when the bug is fixed https://github.com/serverless/serverless/issues/5892
+    package:
+      exclude:
+        - "**"
+      include:
+        - "!**"
+        - headless-chrome/**
+
 functions:
   webInfoExtract:
     handler: src.functions.source_extract.handler.web_info_extract
@@ -151,11 +170,19 @@ functions:
     handler: src.functions.source_extract.handler.source_extract_job_success
   sourceExtractJobFailure:
     handler: src.functions.source_extract.handler.source_extract_job_failure
-  sourceExtractJobMappedTask:
+  sourceExtractJobTask:
     handler: src.functions.source_extract.handler.source_extract_job_mapped_task
     timeout: 300
-  sourceExtractJobMappedTaskFailure:
+  sourceExtractJobTaskFailure:
     handler: src.functions.source_extract.handler.source_extract_job_mapped_task_failure
+
+  sourceThumbnailExtractJobTask:
+    handler: src.functions.thumbnail_generator.handler.source_thumbnail_generator
+    layers:
+      - {Ref: HeadlessChromeLambdaLayer}
+      - arn:aws:lambda:us-east-1:764866452798:layer:libreoffice-brotli:1
+  sourceThumbnailExtractJobTaskFailure:
+    handler: src.functions.thumbnail_generator.handler.source_thumbnail_extract_job_mapped_task_failure
 
   # TODO: Deploy without python dependencies
   authorizerFunc:
@@ -164,14 +191,12 @@ functions:
 
 stepFunctions:
   stateMachines:
-    # TODO: HANDLE LAMBDA ERROR OUTSIDE PYTHON (like timeout)
     SourceExtractStateMachine:
       name: "sourceExtractStateMachine-${self:provider.stage}"
       definition:
-        StartAt: SourceExtractJobMappedTask
+        StartAt: SourceExtractJob
         States:
-          # TODO: Handle errors
-          SourceExtractJobMappedTask:
+          SourceExtractJob:
             Type: Map
             MaxConcurrency: ${self:custom.stepFunctionConfig.MaxConcurrency}
             ItemsPath: $.sources
@@ -183,23 +208,40 @@ stepFunctions:
                 Next: SourceExtractJobFailure
             Next: SourceExtractJobSuccess
             Iterator:
-              StartAt: SourceExtractJobMapTask
+              StartAt: SourceExtractJobTask
               States:
-                SourceExtractJobMapTask:
+                SourceExtractJobTask:
                   Type: Task
                   Resource:
-                    Fn::GetAtt: [sourceExtractJobMappedTask, Arn]
+                    Fn::GetAtt: [sourceExtractJobTask, Arn]
                   ResultPath: $.status
                   Catch:
                     - ErrorEquals:
                       - States.ALL
                       ResultPath: $.error
-                      Next: SourceExtractJobMapTaskFailure
-                  End: true
-                SourceExtractJobMapTaskFailure:
+                      Next: SourceExtractJobTaskFailure
+                  Next: SourceThumbnailExtractJobTask
+                SourceThumbnailExtractJobTask:
                   Type: Task
                   Resource:
-                    Fn::GetAtt: [sourceExtractJobMappedTaskFailure, Arn]
+                    Fn::GetAtt: [sourceThumbnailExtractJobTask, Arn]
+                  ResultPath: $.status
+                  End: true
+                  Catch:
+                    - ErrorEquals:
+                      - States.ALL
+                      ResultPath: $.error
+                      Next: SourceThumbnailExtractJobTaskFailure
+                SourceExtractJobTaskFailure:
+                  Type: Task
+                  Resource:
+                    Fn::GetAtt: [sourceExtractJobTaskFailure, Arn]
+                  End: true
+                  ResultPath: $.status
+                SourceThumbnailExtractJobTaskFailure:
+                  Type: Task
+                  Resource:
+                    Fn::GetAtt: [sourceThumbnailExtractJobTaskFailure, Arn]
                   End: true
                   ResultPath: $.status
           SourceExtractJobSuccess:

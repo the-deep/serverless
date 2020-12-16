@@ -1,12 +1,13 @@
 import re
 import os
 from . import extractors
+from deep_serverless.static import ExtractorStatic
 
-HTML = 'html'
-PDF = 'pdf'
-DOCX = 'docx'
-PPTX = 'pptx'
-MSWORD = 'doc'
+HTML = ExtractorStatic.HTML
+PDF = ExtractorStatic.PDF
+DOCX = ExtractorStatic.DOCX
+PPTX = ExtractorStatic.PPTX
+MSWORD = ExtractorStatic.MSWORD
 
 EXTRACTORS = {
     HTML: extractors.HtmlExtractor,

@@ -24,6 +24,7 @@ from .base import (
 class LeadExtract(MapAttribute):
     simplified_text = UnicodeAttribute(null=True)
     simplified_text_s3_key = UnicodeAttribute(null=True)
+    thumbnail_s3_key = UnicodeAttribute(null=True)
     word_count = NumberAttribute(null=True)
     page_count = NumberAttribute(null=True)
     file_size = NumberAttribute(null=True)
@@ -55,7 +56,6 @@ class Source(Model):
     # Store extra information
     extra_meta = JSONAttribute(null=True)
     status = UnicodeAttribute(default=Status.PENDING)
-    extract_status = UnicodeAttribute(default=Status.NOT_PROCESSED)
     thumbnail_status = UnicodeAttribute(default=Status.NOT_PROCESSED)
 
     class Meta(BaseModelMeta):
@@ -89,6 +89,15 @@ class Source(Model):
             image,
         )
         self.images.add(image_s3_path)
+
+    def set_thumbnail(self, thumbnail):
+        if self.key is None:
+            raise Exception('key needs to be defined')
+
+        self.extract.thumbnail_s3_key = deep_media_storage.upload(
+            f'serverless/source-thumbnail/{os.path.basename(thumbnail.name)}',
+            thumbnail,
+        )
 
     def set_simplified_text(self, text):
         if self.key is None:

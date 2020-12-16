@@ -1,3 +1,4 @@
+import logging
 import requests
 import tldextract
 
@@ -17,6 +18,8 @@ from deep_serverless.utils.common import get_file_name_from_url
 HEADERS = {
     'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/39.0.2171.95 Safari/537.36',  # noqa: E501
 }
+
+logger = logging.getLogger(__name__)
 
 
 class DefaultWebInfoExtractor:
@@ -63,7 +66,11 @@ class DefaultWebInfoExtractor:
                 return get_title_from_pdf(self.content)
             except Exception:
                 return get_file_name_from_url(self.url)
-        return self.readable and self.readable.short_title()
+        try:
+            return self.readable and self.readable.short_title()
+        except Exception:
+            logger.warning('Failed to get title', exc_info=True)
+            return
 
     def get_date(self):
         return extract_date(self.url, self.page)

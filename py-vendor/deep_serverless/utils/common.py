@@ -1,6 +1,10 @@
 import os
+import stat
 import secrets
 import urllib
+import brotli
+import logging
+from io import BytesIO
 from mimetypes import guess_extension
 from urllib.parse import urlparse
 
@@ -8,6 +12,8 @@ try:
     from django.conf import settings as django_settings
 except ImportError:
     pass
+
+logger = logging.getLogger(__name__)
 
 
 USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_1)' + \
@@ -87,3 +93,24 @@ def get_random_string(length, allowed_chars=(
       * length: 22, bit length =~ 131 bits
     """
     return ''.join(secrets.choice(allowed_chars) for i in range(length))
+
+
+def unpack_binary(input_file, output_file, make_executable=True):
+    if os.path.exists(output_file):
+        logger.info(f'We have a cached copy of {input_file}, skipping extraction')
+    else:
+        logger.info(f'No cached copy of {input_file} exists, extracting Brotli file...')
+        buffer = BytesIO()
+        with open(input_file, 'rb') as brotli_file:
+            decompressor = brotli.Decompressor()
+            while True:
+                chunk = brotli_file.read(1024)
+                buffer.write(decompressor.process(chunk))
+                if len(chunk) < 1024:
+                    break
+            buffer.seek(0)
+        with open(output_file, 'wb') as out:
+            out.write(buffer.read())
+    if make_executable:
+        os.chmod(output_file, stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+    return output_file

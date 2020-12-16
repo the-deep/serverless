@@ -59,3 +59,10 @@ class AsyncJob(Model):
     # Store key of the entities here
     entities = UnicodeSetAttribute()
     ttl = NumberAttribute(default=lambda: int(time.time()) + 86400)  # 1 day
+
+
+def get_or_none(model, key):
+    try:
+        return model.get(key)
+    except model.DoesNotExist:
+        pass

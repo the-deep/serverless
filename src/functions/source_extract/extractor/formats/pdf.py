@@ -1,4 +1,6 @@
+import logging
 from io import BytesIO
+
 from pdfminer.pdfparser import PDFParser
 from pdfminer.pdfdocument import PDFDocument
 from pdfminer.pdfinterp import (
@@ -12,6 +14,9 @@ from pdfminer.pdfpage import PDFPage
 
 from pdftitle import get_title_from_io as get_title_from_pdf
 from deep_serverless.utils.common import get_file_name_from_url
+
+
+logger = logging.getLogger(__name__)
 
 
 def process(doc, params):
@@ -32,7 +37,10 @@ def process(doc, params):
                     fp, pagenos, maxpages=maxpages,
                     caching=caching, check_extractable=True,
             ):
-                interpreter.process_page(page)
+                try:
+                    interpreter.process_page(page)
+                except Exception:
+                    logger.warning('PDF interpreter.process_page Error', exc_info=True)
             content = retstr.getvalue().decode()
     pages_count = get_pages_in_pdf(doc)
     title = get_title_in_pdf(doc, params and params.get('url'))

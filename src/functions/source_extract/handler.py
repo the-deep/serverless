@@ -3,6 +3,7 @@ import json
 import os
 import time
 import boto3
+from pdfminer.pdfdocument import PDFEncryptionError
 
 from deep_serverless.utils import sentry  # noqa: F401
 
@@ -19,6 +20,9 @@ from .extractor.file_document import FileDocument
 logger = logging.getLogger(__name__)
 
 step_funtion = boto3.client('stepfunctions')
+
+
+SOURCE_EXTRACT_EXPECTED_EXCEPTIONS = [PDFEncryptionError]
 
 
 def source_extract_job_mapped_task(event, *args, **kwargs):
@@ -58,7 +62,10 @@ def source_extract_job_mapped_task(event, *args, **kwargs):
 
         source.status = Source.Status.SUCCESS
     except Exception as e:
-        logging.error(f'Failed to extract source: ({source.key}){source.url or source.s3_path}', exc_info=True)
+        (
+            logger.error if type(e) not in SOURCE_EXTRACT_EXPECTED_EXCEPTIONS else logger.warning)(
+                f'Failed to extract source: ({source.key}) {source.url or source.s3_path}', exc_info=True
+        )
         error_msg = str(e)
         source.status = Source.Status.ERROR
 

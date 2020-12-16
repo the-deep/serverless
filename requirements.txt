@@ -1,6 +1,7 @@
 PyJWT==1.7.1
 beautifulsoup4==4.7.1
 boto3==1.14.23
+brotli
 html2text==2020.1.16
 lambda-decorators
 parameterized==0.7.0
@@ -12,3 +13,7 @@ readability-lxml==0.7
 requests==2.21.0
 sentry-sdk>=0,<1
 tldextract==2.2.0
+
+# Used by thumbnail generator (requires Zlib and libjpeg packages)
+Pillow==5.4.1
+selenium==3.14
