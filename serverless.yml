@@ -1,5 +1,5 @@
 service: deep-util-services
-frameworkVersion: "=1.72.0"
+frameworkVersion: "=2"
 
 provider:
   name: aws
@@ -19,6 +19,7 @@ provider:
     MEDIA_BUCKET_NAME: ${file(./secrets/${self:provider.stage}.json):MEDIA_BUCKET_NAME}
     MEDIA_BUCKET_ROOT: ${file(./secrets/${self:provider.stage}.json):MEDIA_BUCKET_ROOT}
     SENTRY_DNS: ${file(./secrets/${self:provider.stage}.json):SENTRY_DNS}
+    NLTK_DATA: /opt/nltk_data
   iamRoleStatements:
     - Effect: Allow
       Action:
@@ -132,6 +133,16 @@ functions:
           method: post
           authorizer: ${self:custom.authorizer}
           cors: ${self:custom.cors}
+  handleEntries:
+    handler: src.ngrams.handler.handle_entries
+    events:
+      - http:
+          path: ngram-process
+          method: post
+          authorizer: ${self:custom.authorizer}
+          cors: ${self:custom.cors}
+    layers:
+      - {Ref: NltkLambdaLayer}
 
   sourceExtractJobSuccess:
     handler: src.functions.source_extract.handler.source_extract_job_success
@@ -245,6 +256,14 @@ resources:
       Description: The ARN of the source extraction state machine
       Value:
         Ref: "SourceExtractStateMachineDash${self:provider.stage}"
+
+layers:
+  nltk:
+    path: src/ngrams/nltk
+    name: NltkData
+    description: Nltk data
+    compatibleRuntimes:
+      - python3.8
 
 plugins:
   - serverless-domain-manager

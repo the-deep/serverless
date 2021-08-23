@@ -4,7 +4,7 @@ boto3==1.14.23
 html2text==2020.1.16
 lambda-decorators
 parameterized==0.7.0
-pdfminer.six==20181108
+pdfminer.six==20200402
 pdftitle==0.7
 pynamodb==4.3.2
 pytest
@@ -12,3 +12,6 @@ readability-lxml==0.7
 requests==2.21.0
 sentry-sdk>=0,<1
 tldextract==2.2.0
+nltk==3.4.1
+six==1.12.0
+textblob==0.15.3
