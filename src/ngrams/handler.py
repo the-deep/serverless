@@ -1,9 +1,8 @@
 import json
 import re
 import string
-import nltk
 from nltk.corpus import stopwords
-from nltk.stem.snowball import FrenchStemmer, SpanishStemmer
+from nltk.stem.snowball import EnglishStemmer, FrenchStemmer, SpanishStemmer
 from nltk.util import ngrams
 from collections import Counter, OrderedDict
 
@@ -27,7 +26,7 @@ Sample request body payload
 
 MAX_NGRAMS_ITEMS = 10
 
-stemmer_en = nltk.stem.PorterStemmer()
+stemmer_en = EnglishStemmer()
 stemmer_fr = FrenchStemmer()
 stemmer_es = SpanishStemmer()
 
