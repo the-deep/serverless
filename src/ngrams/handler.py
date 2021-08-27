@@ -8,8 +8,10 @@ from collections import Counter, OrderedDict
 
 from textblob import TextBlob
 
+from src.common.decorators import LambdaDecorator
+
 """
-Sample request body payload
+Sample request body payload (stringify the payload)
 {
     "entries": ["entry1", "entry2"],
     "ngrams": {
@@ -126,41 +128,34 @@ def process(
     return ngrams
 
 
+@LambdaDecorator
 def handle_entries(event, context):
-    try:
-        request_body = json.loads(event["body"])
-        entries = request_body["entries"]
-        process_unigrams = request_body["ngrams"]["unigrams"]
-        process_bigrams = request_body["ngrams"]["bigrams"]
-        process_trigrams = request_body["ngrams"]["trigrams"]
-        enable_stopwords = request_body.get("enable_stopwords", False)
-        enable_stemming = request_body.get("enable_stemming", False)
-        enable_case_sensitive = request_body.get(
-            "enable_case_sensitive", False
-        )
-        max_ngrams_items = request_body.get(
-            "max_ngrams_items", MAX_NGRAMS_ITEMS
-        )
+    request_body = event["body"]
+    entries = request_body["entries"]
+    process_unigrams = request_body["ngrams"]["unigrams"]
+    process_bigrams = request_body["ngrams"]["bigrams"]
+    process_trigrams = request_body["ngrams"]["trigrams"]
+    enable_stopwords = request_body.get("enable_stopwords", False)
+    enable_stemming = request_body.get("enable_stemming", False)
+    enable_case_sensitive = request_body.get(
+        "enable_case_sensitive", False
+    )
+    max_ngrams_items = request_body.get(
+        "max_ngrams_items", MAX_NGRAMS_ITEMS
+    )
 
-        ngram_outputs = process(
-            entries,
-            max_ngrams_items,
-            process_unigrams=process_unigrams,
-            process_bigrams=process_bigrams,
-            process_trigrams=process_trigrams,
-            enable_stopwords=enable_stopwords,
-            enable_stemming=enable_stemming,
-            enable_case_sensitive=enable_case_sensitive
-        )
+    ngram_outputs = process(
+        entries,
+        max_ngrams_items,
+        process_unigrams=process_unigrams,
+        process_bigrams=process_bigrams,
+        process_trigrams=process_trigrams,
+        enable_stopwords=enable_stopwords,
+        enable_stemming=enable_stemming,
+        enable_case_sensitive=enable_case_sensitive
+    )
 
-        response = {
-            "statusCode": 200,
-            "body": json.dumps(ngram_outputs)
-        }
-    except IndexError as e:
-        response = {
-            "statusCode": 500,
-            "body": json.dumps(e)
-        }
-
-    return response
+    return {
+        "statusCode": 200,
+        "body": json.dumps(ngram_outputs)
+    }
