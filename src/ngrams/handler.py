@@ -7,6 +7,7 @@ from nltk.util import ngrams
 from collections import Counter, OrderedDict
 
 from textblob import TextBlob
+from textblob.exceptions import TranslatorError
 
 from src.common.decorators import LambdaDecorator
 
@@ -39,7 +40,11 @@ stopwords_es = stopwords.words('spanish')
 
 def language_detect(entry):
     b = TextBlob(entry)
-    return b.detect_language()
+    try:
+        return b.detect_language()
+    except TranslatorError as e:
+        print(f"{e} Using default language as english.")
+        return 'en'
 
 
 def clean_entry(
@@ -96,16 +101,17 @@ def process(
 
     processed_entries = list()
     for entry in entries:
-        detected_lang = language_detect(entry)
-        processed_entries.append(
-            clean_entry(
-                entry,
-                enable_stopwords,
-                enable_stemming,
-                enable_case_sensitive,
-                language=detected_lang
+        if entry.strip() != "":
+            detected_lang = language_detect(entry)
+            processed_entries.append(
+                clean_entry(
+                    entry,
+                    enable_stopwords,
+                    enable_stemming,
+                    enable_case_sensitive,
+                    language=detected_lang
+                )
             )
-        )
 
     if process_unigrams:
         one_grams = get_ngrams(processed_entries, max_ngrams_items, n=1)
@@ -157,5 +163,5 @@ def handle_entries(event, context):
 
     return {
         "statusCode": 200,
-        "body": json.dumps(ngram_outputs)
+        "ngrams": ngram_outputs
     }
