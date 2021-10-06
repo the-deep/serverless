@@ -6,8 +6,7 @@ from nltk.stem.snowball import EnglishStemmer, FrenchStemmer, SpanishStemmer
 from nltk.util import ngrams
 from collections import Counter, OrderedDict
 
-from textblob import TextBlob
-from textblob.exceptions import TranslatorError
+from langdetect import detect
 
 from src.common.decorators import LambdaDecorator
 
@@ -39,10 +38,9 @@ stopwords_es = stopwords.words('spanish')
 
 
 def language_detect(entry):
-    b = TextBlob(entry)
     try:
-        return b.detect_language()
-    except TranslatorError as e:
+        return detect(entry)
+    except Exception as e:
         print(f"{e} Using default language as english.")
         return 'en'
 
