@@ -14,7 +14,6 @@ provider:
     STAGE: ${self:provider.stage}
     SOURCE_TABLE_NAME: ${self:custom.sourceTableName}
     ASYNC_JOB_TABLE_NAME: ${self:custom.asyncJobTableName}
-    CORS_DOMAIN: ${file(./secrets/${self:provider.stage}.json):CORS_DOMAIN}
     JWT_SECRET_OR_PUBLIC_KEY: ${file(./secrets/${self:provider.stage}.json):JWT_SECRET_OR_PUBLIC_KEY}
     MEDIA_BUCKET_NAME: ${file(./secrets/${self:provider.stage}.json):MEDIA_BUCKET_NAME}
     MEDIA_BUCKET_ROOT: ${file(./secrets/${self:provider.stage}.json):MEDIA_BUCKET_ROOT}
@@ -83,7 +82,7 @@ custom:
   asyncJobTableName: "${self:service}-${self:provider.stage}-async-jobs"
   authorizer: authorizerFunc
   cors:
-    origin: ${self:provider.environment.CORS_DOMAIN}
+    origins: ${file(./secrets/${self:provider.stage}.json):CORS_DOMAINS}
   pythonRequirements:
     dockerizePip: true
     noDeploy:
@@ -233,7 +232,7 @@ resources:
       Type: "AWS::ApiGateway::GatewayResponse"
       Properties:
         ResponseParameters:
-          gatewayresponse.header.Access-Control-Allow-Origin: "'${self:provider.environment.CORS_DOMAIN}'"
+          gatewayresponse.header.Access-Control-Allow-Origin: "'*'"
           gatewayresponse.header.Access-Control-Allow-Headers: "'*'"
         ResponseType: DEFAULT_4XX
         ResponseTemplates:
@@ -244,7 +243,7 @@ resources:
       Type: "AWS::ApiGateway::GatewayResponse"
       Properties:
         ResponseParameters:
-          gatewayresponse.header.Access-Control-Allow-Origin: "'${self:provider.environment.CORS_DOMAIN}'"
+          gatewayresponse.header.Access-Control-Allow-Origin: "'*'"
           gatewayresponse.header.Access-Control-Allow-Headers: "'*'"
         ResponseType: DEFAULT_5XX
         ResponseTemplates:
