@@ -49,7 +49,7 @@ TEST_CASES = {
         'response': {
             'authorsRaw': ['Nutrition Cluster', 'UNICEF'],
             'country': 'South Sudan',
-            'date': '2023-05-28',
+            'date': '2020-05-28',
             'sourceRaw': 'reliefweb',
             'title': 'South Sudan: Nutrition Service Delivery In COVID-19 Context - Frequently asked question and suggested measures',  # noqa:E501
             'website': 'reliefweb.int',
