@@ -54,7 +54,7 @@ TEST_CASES = {
             'title': 'South Sudan: Nutrition Service Delivery In COVID-19 Context - Frequently asked question and suggested measures',  # noqa:E501
             'website': 'reliefweb.int',
             'pdfUrls': [
-                'https://reliefweb.int//attachments/9fc61749-e380-460d-9809-bfcf3be77722/nutrition_covid_19_-_faq_and_recommendations_-_updated_29.05.2020_1.pdf'  # noqa:E501
+                'https://reliefweb.int/attachments/9fc61749-e380-460d-9809-bfcf3be77722/nutrition_covid_19_-_faq_and_recommendations_-_updated_29.05.2020_1.pdf'  # noqa:E501
             ],
         },
     },

@@ -33,8 +33,10 @@ class ReliefwebExtractor(DefaultWebInfoExtractor):
                     href_tag = url.find('a')
                     if href_tag:
                         url_list.append(
-                            'https://reliefweb.int/' +
-                            urllib.parse.unquote(href_tag.get('href'))
+                            urllib.parse.urljoin(
+                                'https://reliefweb.int/',
+                                urllib.parse.unquote(href_tag.get('href'))
+                            )
                         )
             return url_list
         return []
