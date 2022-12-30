@@ -3,6 +3,8 @@ name: CI
 on:
   pull_request:
   push:
+    branches:
+      - develop
 
 jobs:
   test:
@@ -13,9 +15,11 @@ jobs:
       - uses: actions/checkout@v2
 
       - uses: actions/setup-node@v1
+        with:
+          node-version: 19.2
       - uses: actions/setup-python@v2
         with:
-          python-version: '3.x'
+          python-version: '3.10.8'
 
       - name: Cache yarn
         uses: actions/cache@v1
@@ -33,14 +37,20 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pip-
 
-      - name: Run yarn install
-        run: yarn install
-
       - name: pip install
         run: pip install -r requirements.txt
 
-      - name: sls package
-        run: cp ./secrets/sample.json ./secrets/local.json && npx sls package
-
       - name: Pytest
-        run: pytest
+        env:
+          AWS_DEFAULT_REGION: us-east-1
+        run: source ./.env.testing.sample && pytest -ra -v --durations=10
+
+      - name: Run yarn install
+        run: yarn install --frozen-lockfile
+
+      # - name: sls package
+      #   env:
+      #     AWS_DEFAULT_REGION: us-east-1
+      #     AWS_ACCESS_KEY_ID: XXXXXXXXXXXXXXXXXXXX
+      #     AWS_SECRET_ACCESS_KEY: XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+      #   run: cp ./secrets/sample.json ./secrets/local.json && sls package --stage local

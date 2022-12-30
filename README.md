@@ -36,14 +36,25 @@ The configuration are stored in `secrets` directory. Copy `secrets/sample.json` 
 
 
 ## Offline
-```
+Lambda server
+```bash
 # Start local lambda server
 # TODO: hot reload not working
 PYTHONPATH=.python-venv npx sls offline
+```
 
-
-# Unit tests
-PYTHONPATH=.python-venv pytest **/*test.py
+Unit tests
+```bash
+# Create virtual-venv
+python3 -m venv .python-venv
+# Activate venv
+source .python-venv/bin/activate
+# Install packages
+pip install -r requirements.txt
+# Create/Copy env
+cp .env.testing.sample .env
+# Read test env and run test
+source .env && ./.python-venv/bin/pytest -vv --last-failed
 ```
 
 ## Deploying

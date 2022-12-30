@@ -1,5 +1,5 @@
 service: deep-util-services
-frameworkVersion: "=2"
+frameworkVersion: "=3"
 
 provider:
   name: aws
@@ -74,7 +74,7 @@ custom:
       #   ReadCapacityUnits: 1
       #   WriteCapacityUnits: 1
     BillingMode: ${self:custom.dynamodbConfig.${self:provider.stage}.BillingMode, "PROVISIONED"}
-    ProvisionedThroughput: ${self:custom.dynamodbConfig.${self:provider.stage}.ProvisionedThroughput}
+    ProvisionedThroughput: ${self:custom.dynamodbConfig.${self:provider.stage}.ProvisionedThroughput, null}
   dynamodb:
     stages:
       - ${self:provider.stage}
@@ -210,7 +210,7 @@ resources:
           - AttributeName: uuid
             KeyType: HASH
         BillingMode: ${self:custom.dynamodbConfig.BillingMode}
-        ProvisionedThroughput: ${self:custom.dynamodbConfig.ProvisionedThroughput}
+        ProvisionedThroughput: ${self:custom.dynamodbConfig.ProvisionedThroughput, null}
         TableName: ${self:custom.asyncJobTableName}
         TimeToLiveSpecification:
           AttributeName: ttl
@@ -226,7 +226,7 @@ resources:
           - AttributeName: key
             KeyType: HASH
         BillingMode: ${self:custom.dynamodbConfig.BillingMode}
-        ProvisionedThroughput: ${self:custom.dynamodbConfig.ProvisionedThroughput}
+        ProvisionedThroughput: ${self:custom.dynamodbConfig.ProvisionedThroughput, null}
         TableName: ${self:custom.sourceTableName}
     GatewayResponseDefault4XX:
       Type: "AWS::ApiGateway::GatewayResponse"

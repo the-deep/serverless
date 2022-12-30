@@ -6,6 +6,7 @@ function/
 .mypy_cache/
 node_modules/
 .python-venv/
+.env
 
 # Distribution / packaging
 .Python

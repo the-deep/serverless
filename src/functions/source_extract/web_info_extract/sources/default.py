@@ -43,17 +43,19 @@ class DefaultWebInfoExtractor:
         date = self.get_date()
         country = self.get_country()
         source_raw = self.get_source()
-        author_raw = self.get_author()
+        authors_raw = self.get_authors()
         website = self.get_website()
         title = self.get_title()
+        pdf_urls = self.get_pdf_urls()
 
         return {
             'source_raw': source_raw,
-            'author_raw': author_raw,
+            'authors_raw': authors_raw,
             'title': title,
             'date': date,
             'country': country,
             'website': website,
+            'pdf_urls': pdf_urls,
         }
 
     def get_title(self):
@@ -67,6 +69,12 @@ class DefaultWebInfoExtractor:
 
     def get_date(self):
         return extract_date(self.url, self.page)
+
+    def get_pdf_urls(self):
+        """
+        Not implemented
+        """
+        return []
 
     def get_country(self):
         if not self.page:
@@ -87,11 +95,13 @@ class DefaultWebInfoExtractor:
         tldextract_extract = tldextract.TLDExtract(cache_file='/tmp/.tldextract-tld_set')
         return tldextract_extract(self.url).domain
 
-    def get_author(self):
+    def get_authors(self):
+        authors = []
         if self.page:
             source = self.page.select('footer .meta .source li')
             if source:
-                return source[0].text.strip()
+                authors.append(source[0].text.strip())
+        return authors
 
     def get_website(self):
         return urlparse(self.url).netloc

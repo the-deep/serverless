@@ -1,4 +1,3 @@
-import json
 import re
 import string
 from nltk.corpus import stopwords
